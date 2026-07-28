@@ -1,0 +1,96 @@
+# SCENG1.VCE - Sound Canvas voice bank for the Stunts sound effects.
+#
+# Records are copied from MTENG1.VCE, so the note transposes and envelope shapes
+# the effect code depends on are preserved.
+#
+# ENGI is the one place where a parameter rather than a program had to change.
+# The engine note is a single sustained note whose pitch driver slot 24h sweeps
+# continuously, and MTENG1.VCE gives it a 24 semitone bend range, so the note
+# travels four octaves. The MT-32 could carry that because its Engine 1 timbre
+# stacked four ring modulated partials an octave apart; one sample swept that
+# far is a siren whatever program it is. The bend column below narrows it to 12,
+# an octave, which is the range the SC-55 Car-Engine sample holds up over.
+# That number was set by ear and is the first thing to try moving if the engine
+# sounds wrong; see docs/instruments.md.
+#
+# The MT-32 programs here do not name factory presets.  Programs 0..4 are
+# overwritten by MT32.PLB with five custom timbres, whose names are stored in
+# the timbre headers and are the only description of the intended sound:
+#
+#   patch 0  "Engine 1"     patch 3  "MetalClank"
+#   patch 1  "Squeel"       patch 4  "Engine 1"
+#   patch 2  "Damage"
+#
+# A General MIDI device has no patch memory, so each effect is mapped to the
+# closest standard program instead.  docs/instruments.md explains why.
+#
+# Volume stays 0 on every effect: that is the flag that tells SC15.DRV not to
+# send CC 7 at program change time, which leaves the running volume that the
+# effect code writes through driver slot 12h in place.  Pan is centred, since
+# the MT-32 bank leaves STAR and STOP at 0 where the rest of the bank uses 64.
+
+source ../stunts/MTENG1.VCE
+size 93
+
+# Decoding the timbre parameters out of MT32.PLB, not just the names, shows why
+# a melodic lead was the wrong choice.  Every effect timbre is built out of ring
+# modulated pairs and ROM PCM samples, which is inharmonic and noisy:
+#
+#   Engine 1    P1>S2 ring and S1>P2 ring, four sawtooth partials pitched 12 to
+#               36 semitones down, PCM waves 43 and 53, pitch bender enabled
+#   Squeel      two square partials at pulse width 100 and 88, which is a very
+#               thin nasal pulse, plus two PCM partials
+#   Damage      four ring modulated partials, PCM waves 18, 19, 24 and 83,
+#               pitch bender disabled
+#   MetalClank  two PCM partials, 69 and 88, ring modulated
+#
+# A clean sawtooth or square swept over 24 semitones is a siren, not an engine.
+# The programs below are chosen for noise content instead of for pitch, which
+# is the property the MT-32 originals actually had.
+#
+# Plain General MIDI has no car sounds at all, which is why nothing in bank 0
+# works here.  A Roland SC-55 does have them, in the GS variation banks under
+# capital tone 125, Helicopter:
+#
+#   bank 1  Car-Engine     bank 4  Car-Crash     bank 7  Jetplane
+#   bank 2  Car-Stop       bank 5  Siren         bank 8  Starship
+#   bank 3  Car-Pass       bank 6  Train         bank 9  Burst Noise
+#
+# and a scrape under capital tone 120, Guitar Fret Noise, at bank 6, Pick
+# Scrape.  Those are what the bank column below selects.  The driver only emits
+# CC 0 when its GS flag is set, so with GS off none of this is sent and the
+# program number alone applies; that is the General MIDI fallback and it is
+# what the last column of comments names.
+#
+# name from  program volume pan bend channel bank
+#                                   MT-32 timbre  -> SC-55 GS sound (GM fallback)
+#
+# The engine does not come from a track like the other effects.  sub_39050
+# builds an event in memory with the note byte set to 0FFh, which the engine
+# sign extends to -1, so the note played is transpose - 1 and it is held
+# indefinitely while slot 24h drives the pitch from the rev counter.  With the
+# MT-32 transpose of 12 that is MIDI note 11, which is 49 semitones below the
+# root key of any sampled program: unusable mud.  The MT-32 got away with it
+# because Engine 1 is a synthesised ring modulated stack, not a sample, and an
+# oscillator at note 11 is just a low buzz, which is what an engine is.
+# A sample has to be played near its root key instead, hence transpose 61.
+ENGI  ENGI   125     =      64  12   =       1   transpose=61  # "Engine 1" -> Car-Engine  (Helicopter)
+STAR  STAR   125     =      64  =    =       1   # "Engine 1"  -> Car-Engine  (Helicopter)
+STOP  STOP   125     =      64  =    =       2   # "Engine 1"  -> Car-Stop    (Helicopter)
+# Car-Stop is a purpose built tyre screech, so it wants its natural pitch
+# rather than the MT-32 transposes of +28 and +19.
+SKID  SKID   125     =      64  =    =       2   transpose=0   # "Squeel"   -> Car-Stop    (Helicopter)
+SKI2  SKI2   125     =      64  =    =       2   transpose=7   # "Squeel"   -> Car-Stop    (Helicopter)
+CRAS  CRAS   125     =      64  =    =       4   # "Damage"    -> Car-Crash    (Helicopter)
+BLOW  BLOW   127     =      64  =    =       3   # "Damage"    -> Explosion    (Gun Shot)
+# Scratch, not Pick Scrape: capital tone 120 only has variations 1 and 2 on an
+# SC-55, and Pick Scrape at bank 6 is an SC-88 addition that a mkII would
+# silently fall back on.  Scratch is the closest thing the SC-55 has to metal
+# dragging along a wall.
+SCRA  SCRA   124     =      64  =    =       4   # "Damage"    -> Scratch      (Telephone 1)
+# Punch, not Synth Drum.  Synth Drum was the faithful derivation from the MT-32's
+# Elec Perc 1, and it is faithful in the sense that it sounds like a drum, which
+# is what the MT-32 build also did.  On a device that has a dedicated impact
+# sound there is no reason to land a jumping car on a tuned percussion note.
+# Revert to 118 bank 0 if the thud is too soft.
+BUMP  BUMP   126     =      64  =    =       3   # Elec Perc 1 -> Punch         (Applause)

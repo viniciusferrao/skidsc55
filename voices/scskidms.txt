@@ -1,0 +1,105 @@
+# SCSKIDMS.VCE - Sound Canvas voice bank for the four Stunts songs
+# (SKIDTITL, SKIDSLCT, SKIDVICT, SKIDOVER).
+#
+# Every record is copied from MTSKIDMS.VCE so the envelopes, LFO settings and
+# note transposes the composer wrote stay untouched; only the MIDI facing
+# fields are replaced.  docs/instruments.md explains each choice.
+#
+# The MT-32 program numbers in MTSKIDMS.VCE index the synth's patch memory,
+# which Stunts leaves at the factory default except for patches 0..4.  A
+# factory patch n selects preset timbre n, so the MT-32 sound behind each part
+# is known by name, and each General MIDI program below is the nearest
+# equivalent of that name.
+#
+# channel: the MT-32 bank already pins every part to a fixed MIDI channel and
+# those assignments are kept, which also keeps DRUM on channel 9, that is
+# MIDI channel 10, the General MIDI percussion channel.
+
+source ../stunts/MTSKIDMS.VCE
+size 93
+
+# Left at 1.0, and it should stay there. This factor used to be 0.7, to sit the
+# music under the engine, and it could not do that job: the songs set their own
+# channel volumes for some parts and not others, so scaling the bank attenuated
+# a subset of the arrangement and left the rest alone.
+#
+# SKIDTITL is the clearest case. Its drum and bass tracks each send CC 7 right
+# after selecting their instrument, 111 and 127, which overrides whatever this
+# bank asked for. Its lead, harmony and Strat tracks send no CC 7 at all, so
+# those keep the bank value. A 0.7 factor therefore turned the melody and the
+# harmony down by 3 dB and left the rhythm section at full level, which is
+# audible as a percussive, dominant opening with weak horns behind it.
+#
+#   sc15 kms SKIDTITL.KMS -events | grep controller
+#
+# Every level below is now the composer's own, straight from MTSKIDMS.VCE, so
+# the balance is the one written for the MT-32. To move the music against the
+# engine, use the driver's master volume in the configuration block instead;
+# see docs/driver.md section 7. That scales the effects too, which is a
+# real cost, but it is at least applied to the whole score evenly.
+volumescale 1.0
+
+# name from  program volume pan bend channel bank
+#                                   MT-32 preset      -> General MIDI program
+# MTSKIDMS.VCE transposes four instruments up 12: BASS, HRN1, HRN2 and HRN9.
+# BASS cancels that here and the three horns keep it. The asymmetry is a
+# judgement about a sampler, not a reading of the original.
+#
+# Measured from recordings of SKIDVICT with every other track ended inside the
+# song data: on one sustained note the MT-32 plays the bass at A#2, 116 Hz, and
+# the horn at A#4, 466 Hz, both being the note the bank hands it plus the 12.
+# Across the bands where an untransposed version plays its lowest notes the
+# MT-32 sits 18.2 dB under it for the bass and 32.6 dB for the horn. Syn Bass 3
+# and Fr Horn 1 carry no coarse tuning inside the patch, so none of the four
+# transposes is a mistake.
+#
+# What a sampler makes of them differs by part. All three combinations were
+# built and listened to:
+#
+#   all four at 12   the MT-32's own octaves, and the worst of the three. A
+#                    sampled bass cannot carry that register at all.
+#   BASS at 0        this bank. The horns keep the top of their range, which is
+#                    where the harmony lives.
+#   all four at 0    consistent, and it trades those high notes for nothing.
+#                    Add transpose=0 to the three HRN lines to build it.
+#
+# docs/story.md section 7 has the measurement and the recordings. The program
+# choice for BASS is a separate question, argued in docs/instruments.md 3.0.
+BASS  BASS   39      127    =   =    =       0  transpose=0   # Syn Bass 3 -> Synth Bass 2
+HRN1  HRN1   60      78     =   =    =       0   # Fr Horn 1    -> French Horn
+HRN2  HRN2   60      78     =   =    =       0   # Fr Horn 1    -> French Horn
+HRN9  HRN9   60      97     =   =    =       0   # Fr Horn 1    -> French Horn
+LEAD  LEAD   62      88     =   =    =       0   # Syn Brass 1  -> Synth Brass 1
+GUIT  GUIT   27      102    =   =    =       0   # Elec Gtr 2   -> Electric Guitar (clean)
+VOXX  VOXX   52      102    =   =    =       0   # Chorale      -> Choir Aahs
+KEYS  KEYS   52      102    =   =    =       0   # Chorale      -> Choir Aahs
+SNTH  SNTH   5       99     =   =    =       0   # Elec Piano 3 -> Electric Piano 2
+HRM1  HRM1   0       0      =   =    =       0   # Acou Piano 1 -> Acoustic Grand Piano
+
+# DRUM is played on the percussion channel and its program number selects a kit
+# rather than a timbre, so 0 (Standard Kit) is correct.  Pan is moved to centre:
+# the MT-32 bank leaves it at 0, which a General MIDI device would obey and pan
+# the whole kit hard to one side.
+#
+# Volume is the MT-32 bank's own 119, and lowering it here achieves nothing on
+# SKIDTITL or SKIDSLCT: both songs send CC 7 on the drum track immediately after
+# the instrument is selected, which overwrites this value. It is kept correct
+# for the songs and sections that do not.
+DRUM  DRUM   0       119    64  =    =       0
+
+# STRT is played by track 5 of SKIDTITL, "Strat", but it is missing from
+# MTSKIDMS.VCE, so that track is silent on an MT-32.  The AdLib and Tandy banks
+# both provide it, so it is reconstructed here from the GUIT record and given
+# channel 8, which SKIDTITL does not otherwise use.
+#
+# It occupies notes 54..66, and plays 67 notes to HRN1's 52, so whatever level
+# it is given it competes with the harmony. HRN1 is written 52..68, the same
+# register on paper, but its transpose of 12 sounds it at 64..80, an octave
+# clear of the Strat. The two only collide in the all-four-at-0 variant above,
+# where this level is the first thing to revisit.
+#
+# Its level is the one number in this file with no reference behind it, because
+# there is no MT-32 recording of a part the MT-32 never played. 55 keeps it
+# below HRN1's 78, which is where a part the composer never got to hear
+# belongs. Delete this line to match the MT-32 build exactly.
+STRT  GUIT   27      55     =   =    8       0   # (absent on MT-32) -> Electric Guitar (clean)

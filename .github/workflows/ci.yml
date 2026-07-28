@@ -1,0 +1,196 @@
+name: build
+
+# The tooling targets everything from a 1988 DOS compiler to a current Unix, so
+# the build matrix is the specification, not decoration.
+#
+# Two things deliberately are not here. The driver is 16-bit assembly and needs
+# TASM plus a linker that emits a flat binary, neither of which a Linux runner
+# has, so SC15.DRV is built and checked locally. And test/drvtest needs a real
+# driver image to run against, so the same applies to it; CI compiles it but
+# cannot exercise it.
+#
+# What CI can do is prove the tooling, using data it generates rather than data
+# it ships. mkvce reads the game's own MT-32 voice banks, which this project
+# does not redistribute, so test/selfchk.c synthesises a bank with known field
+# values and asserts what comes out the other side. It is C because every check
+# it makes has to be makeable on the machine the tooling targets, which is DOS.
+on: [push, pull_request]
+
+jobs:
+  # cppcheck reasons about the whole translation unit rather than one
+  # expression at a time, so it reaches things -Wall cannot: buffers indexed
+  # past their end, allocations never freed on an error path. GCC's analyzer
+  # walks execution paths and is good at the goto-cleanup shape mkvce uses.
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: cppcheck
+        run: |
+          cppcheck --std=c89 --enable=warning,performance,portability \
+                   --inline-suppr --error-exitcode=1 \
+                   --suppress=missingIncludeSystem \
+                   src/ test/
+
+      # One file at a time: -c with several inputs and a single -o is an error.
+      - name: GCC analyzer
+        run: |
+          for f in src/*.c test/*.c; do
+            gcc -std=c90 -pedantic-errors -Wall -Wextra -Wshadow -Wcast-qual \
+                -Wstrict-prototypes -Wmissing-prototypes -Wwrite-strings \
+                -fanalyzer -O2 -I src -c "$f" -o /dev/null
+          done
+
+  # Blocking, because the tree conforms. The version is pinned: clang-format's
+  # options and their defaults change between majors, so an unpinned formatter
+  # reformats the tree the day the runner image moves.
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format 22
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-22 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-format-22
+
+      - name: Check formatting
+        run: |
+          clang-format-22 --dry-run --Werror --style=file \
+            src/*.c src/*.h test/*.c test/*.h
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        cc: [gcc, clang]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (strict C90)
+        run: |
+          ${{ matrix.cc }} -std=c90 -pedantic-errors \
+            -Wall -Wextra -Wshadow -Wcast-qual -Wformat=2 \
+            -Wstrict-prototypes -Wmissing-prototypes \
+            -O2 -o sc15 src/util.c src/mkvce.c src/cfg.c src/kms.c src/block.c src/main.c
+          ${{ matrix.cc }} -std=c90 -pedantic-errors \
+            -Wall -Wextra -Wshadow -Wformat=2 \
+            -Wstrict-prototypes -Wmissing-prototypes \
+            -O2 -I src -o drvtest test/emu86.c test/drvtest.c
+          ${{ matrix.cc }} -std=c90 -pedantic-errors \
+            -Wall -Wextra -Wshadow -Wformat=2 \
+            -Wstrict-prototypes -Wmissing-prototypes \
+            -O2 -I src -o selfcheck test/selfchk.c \
+            src/util.c src/mkvce.c src/cfg.c src/kms.c src/block.c
+
+      - name: Self-check
+        run: ./selfcheck
+
+  # The tooling parses text the user wrote and walks a binary container by
+  # offsets read out of that binary, so the interesting failures are the ones a
+  # static pass cannot see.
+  sanitize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with ASan and UBSan
+        run: |
+          clang -std=c90 -pedantic-errors -Wall -Wextra -g -O1 -I src \
+                -fsanitize=address,undefined -fno-omit-frame-pointer \
+                -o selfcheck test/selfchk.c src/util.c src/mkvce.c src/cfg.c src/kms.c src/block.c
+          # -fno-sanitize-recover matters here. UBSan's default is to report and
+          # carry on, which leaves the exit status untouched, and the malformed
+          # container step below decides what happened from that status alone.
+          clang -std=c90 -pedantic-errors -Wall -Wextra -g -O1 -I src \
+                -fsanitize=address,undefined -fno-sanitize-recover=all \
+                -fno-omit-frame-pointer \
+                -o sc15 src/util.c src/mkvce.c src/cfg.c src/kms.c src/block.c src/main.c
+
+      # The self-check feeds mkvce and cfg a spread of malformed input and
+      # requires each to be refused. It calls them in its own process, so the
+      # sanitizers see the refusal paths, which is where a half-parsed record
+      # or a freed-twice buffer would show up.
+      - name: Self-check under the sanitizers
+        run: |
+          export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+          export ASAN_OPTIONS=halt_on_error=1
+          ./selfcheck
+
+      # kms walks a binary container on offsets read out of that same binary,
+      # which makes it the parser least able to trust what it is given, and the
+      # self-check cannot reach it: it needs a song, and songs are game data
+      # this repository does not carry. Garbage is enough. Every one of these
+      # has to be refused or decoded without the sanitizers objecting, and
+      # nothing here has to look like a real song for that to be the point.
+      - name: kms against malformed containers
+        run: |
+          # A refusal exits 1, and so does a sanitizer that stops on an error, so
+          # the two were indistinguishable and a real finding read as a correct
+          # rejection. The sanitizers need a status of their own.
+          #
+          # One status, not two. exitcode is a sanitizer-common flag rather than
+          # a per-tool one, so the runtimes share it and whichever *SAN_OPTIONS
+          # is parsed last wins: an ASan-only binary was seen exiting 87 because
+          # UBSAN_OPTIONS had supplied that value. The loop below only has to
+          # tell a sanitizer from a refusal, and one code does that.
+          export ASAN_OPTIONS=halt_on_error=1:exitcode=86
+          export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1:exitcode=86
+
+          # Prove it, on both paths, built the way sc15 is built. The whole
+          # check below rests on this status arriving intact.
+          printf '#include <stdlib.h>\nint main(void){char *p=malloc(4);return p[8];}\n' > smoke-asan.c
+          printf 'int main(void){int i=2147483647;return i+1;}\n' > smoke-ubsan.c
+          for t in asan ubsan; do
+            clang -std=c90 -g -O0 -fsanitize=address,undefined \
+                  -fno-sanitize-recover=all -o smoke-$t smoke-$t.c
+            if ./smoke-$t > /dev/null 2>&1; then s=0; else s=$?; fi
+            test "$s" -eq 86 || \
+              { echo "smoke-$t exited $s, expected 86"; exit 1; }
+          done
+          echo "both sanitizers exit 86, which no refusal does"
+          mkdir -p fuzz
+          for i in $(seq 1 64); do
+            head -c $((i * 37)) /dev/urandom > fuzz/r$i.kms
+          done
+          # Containers that start out plausible and then are not: a header shape
+          # with a chunk count that does not fit what follows. The counts are
+          # 1, 2, 200 and 65535 as little endian words.
+          i=0
+          for n in '\001\000' '\002\000' '\310\000' '\377\377'; do
+            i=$((i + 1))
+            printf 'XXXX' > fuzz/h$i.kms
+            printf "$n" >> fuzz/h$i.kms
+            head -c 64 /dev/urandom >> fuzz/h$i.kms
+          done
+          # Actions runs this with bash -e, and a refusal is exactly what most
+          # of these should produce, so the status has to be caught rather than
+          # read afterwards. Written the other way the step died on the first
+          # correct refusal and tested one file.
+          # 0 is a decode, 1 is a refusal, and both are correct. Anything else
+          # is the sanitizers, so keep their report rather than discarding it
+          # down /dev/null with everything else.
+          rc=0
+          for f in fuzz/*.kms; do
+            if ./sc15 kms "$f" -events > /dev/null 2> err.txt; then
+              s=0
+            else
+              s=$?
+            fi
+            if [ "$s" -ne 0 ] && [ "$s" -ne 1 ]; then
+              echo "== sc15 kms $f exited $s"
+              cat err.txt
+              rc=1
+            fi
+          done
+          exit "$rc"
