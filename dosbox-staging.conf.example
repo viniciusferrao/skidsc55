@@ -1,0 +1,88 @@
+# DOSBox Staging configuration for testing SC15.DRV against an emulated
+# Roland SC-55.  This is the reference setup.
+#
+#     dosbox.exe --noprimaryconf --conf dosbox-staging.conf
+#
+# Staging 0.83 and newer embed Nuked SC-55, a cycle accurate emulation of the
+# SC-55 hardware driven by the real firmware ROMs, as a CLAP plugin.  That
+# matters here because the sound effects need the GS variation banks, and no
+# SoundFont carries them: General MIDI has no engine, no tyre screech and no
+# car crash anywhere in its 128 programs, so a sample player cannot get the
+# effects right no matter which font it loads.
+#
+# ROMs go in a version named subdirectory of the Staging configuration folder,
+# not loose in the parent:
+#
+#     Windows  %LOCALAPPDATA%\DOSBox\soundcanvas-roms\SC-55-v1.21\
+#     macOS    ~/Library/Preferences/DOSBox/soundcanvas-roms/SC-55-v1.21/
+#     Linux    ~/.config/dosbox/soundcanvas-roms/SC-55-v1.21/
+#
+# holding five loose files: sc55_rom1.bin, sc55_rom2.bin, sc55_waverom1.bin,
+# sc55_waverom2.bin and sc55_waverom3.bin.  Staging identifies the set by
+# content, so the model does not need to be named.
+#
+# --noprimaryconf matters.  Staging loads its primary configuration underneath
+# any --conf file, and a stale one from an older release will quietly override
+# mididevice and send the game somewhere else.
+
+[sdl]
+fullscreen  = false
+window_size = 960x600
+output      = opengl
+
+[render]
+shader = crt-auto
+
+# Roughly a 486DX2-66. DOSBox cycles are instructions per millisecond and do
+# not map onto a real clock speed exactly, so treat this as a ballpark and nudge
+# it with Ctrl+F11 and Ctrl+F12.
+#
+# Leave the core on auto. Staging suggests the dynamic core above 20000 cycles,
+# and that advice is wrong for this game: LOAD.EXE assembles the executable in
+# memory and jumps into it, so the code the CPU runs is written at run time. A
+# recompiler caches translated blocks by address, and on a second launch in the
+# same session those addresses hold different code. Forcing core = dynamic here
+# produced exactly that: the first launch was fine, quitting and launching again
+# died without restoring the video mode, leaving COMMAND.COM drawing its prompt
+# into the 320x200 framebuffer. auto uses the normal core for real mode, which
+# is what Stunts is, and keeps the recompiler for protected mode where it is
+# safe.
+[cpu]
+cpu_cycles = 60000
+cputype = 486
+core = auto
+
+[mixer]
+rate = 48000
+
+[midi]
+mpu401     = intelligent
+mididevice = soundcanvas
+
+# Nothing else should make a sound, so anything audible came out of the MIDI
+# port.
+[sblaster]
+sbtype = none
+
+[speaker]
+pcspeaker = none
+
+[autoexec]
+# EDIT: the game directory, holding SC15.DRV, SCSKIDMS.VCE and SCENG1.VCE
+# alongside whatever else came with your copy.
+mount c "D:\path\to\stunts"
+c:
+
+# A reconstructed executable, as restunts builds it.
+GAME.EXE /sSC
+
+# A shipped release instead. It has no GAME.EXE: LOAD.EXE assembles one in
+# memory at every launch, and takes the same /s switch. /u picks the video
+# variant and has to name one you have, EGA, CGA, TDY or MCGA. Comment out the
+# line above and use this one.
+#LOAD.EXE /u EGA /ssc
+
+# Or go through the launcher, which reads the switch out of the second line of
+# SETUP.DAT. Change the /spc there to /ssc first, keeping the CRLF line endings
+# intact, and note that re-running SETUP.EXE reverts it.
+#STUNTS.COM

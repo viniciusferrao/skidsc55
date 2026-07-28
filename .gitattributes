@@ -1,0 +1,34 @@
+# LF in the repository for everything text. A CRLF shebang line makes a shell
+# script fail on Unix with a confusing "bad interpreter" error, and an awk
+# script that emits binary would write a stray CR into every record.
+* text=auto eol=lf
+
+# Except what DOS parses: COMMAND.COM wants CRLF and mis-parses a lone LF, the
+# same goes for cmd.exe, and the assembler source is built by tools of that era.
+# Both spellings of the batch extension, because pattern matching is only case
+# insensitive on a case insensitive filesystem and the files are MSCBUILD.BAT,
+# TCBUILD.BAT and WCLBUILD.BAT.
+*.bat text eol=crlf
+*.BAT text eol=crlf
+*.asm text eol=crlf
+*.inc text eol=crlf
+
+# The C sources check out CRLF, because DOS is a first-class build host and
+# Turbo C 2.01 miscompiles a source file with Unix line endings: it emits a
+# nearly empty object, reports nothing at all, and the failure surfaces much
+# later as an undefined _main at link time. skidset measured this before the
+# rule existed there; the rule is mirrored here with the compiler.
+#
+# The other compilers read either ending, so this costs the hosted builds
+# nothing. eol=crlf changes the checkout only: the blobs stay LF, so diffs,
+# blame and review are unaffected.
+*.c text eol=crlf
+*.h text eol=crlf
+
+# The voice bank specifications are space-aligned tables read by mkvce on DOS
+# and on Unix alike, so keep one spelling and no trailing CR can reach a field
+# value.
+voices/*.txt text eol=lf
+
+# The comparison recordings in docs/audio are binary.
+*.mp3 binary

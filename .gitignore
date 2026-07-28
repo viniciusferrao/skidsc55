@@ -1,0 +1,36 @@
+# Build output, in the spellings the various toolchains produce. Anchored to
+# the root, because bin/ holds the same names as checked in release binaries.
+/sc15
+/sc15.exe
+/SC15.EXE
+/SCCHECK.EXE
+/SC1532.EXE
+/SCCHK32.EXE
+/SC15W.EXE
+/SCCHKW.EXE
+__wcl__.lnk
+/drvtest
+/drvtest.exe
+/selfcheck
+/selfcheck.exe
+/SC15.DRV
+/build/
+*.o
+*.obj
+*.OBJ
+*.map
+*.MAP
+*.log
+*.LOG
+*.tmp
+
+# Generated voice banks stay out of the tree, except the released pair in
+# bin/. The banks are the game's instrument parameters adapted for a different
+# synthesiser, shipped so that installing the driver does not require the
+# build toolchain; rebuilding them from your own game copy remains supported
+# and release-check proves the shipped pair is what the build produces. The
+# unanchored pattern still catches build output here and SCTEST.VCE from the
+# self-check. See bin/README.md.
+*.VCE
+!bin/*.VCE
+

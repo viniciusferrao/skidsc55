@@ -1,0 +1,107 @@
+# DOSBox-X configuration for testing SC15.DRV, and its MT-32 counterpart.
+#
+# Copy this next to the game, edit the two paths marked EDIT, and run
+#     dosbox-x.exe -conf dosbox-x.conf
+#
+# DOSBox 0.74 works too, but on Windows it can only reach the Microsoft GS
+# Wavetable Synth, which is not a useful reference for a driver whose target is
+# a Roland SC-55.  DOSBox-X has FluidSynth built in, so it needs nothing but a
+# SoundFont file, and it can also emulate a real MT-32 from ROM images, which
+# makes an A/B against the original MT15.DRV possible on one machine.
+#
+# To hear the original instead of the General MIDI build, swap the [midi]
+# section for the MT-32 block at the bottom and change /sSC to /sMT.
+
+[sdl]
+fullscreen       = false
+output           = openglnb
+autolock         = false
+waitonerror      = true
+priority         = higher,normal
+
+[dosbox]
+machine      = vga_only
+startbanner  = false
+fastbioslogo = true
+memsize      = 16
+title        = Stunts 1.1 + SC15.DRV
+
+[render]
+aspect   = true
+scaler   = none
+glshader = crt-easymode.glsl
+
+[cpu]
+core    = auto
+cputype = auto
+cycles  = max
+
+[mixer]
+rate      = 48000
+blocksize = 1024
+prebuffer = 25
+
+# Real Roland hardware.  This is the target: the sound effects need the GS
+# variation banks, and no General MIDI SoundFont carries them.
+#
+# midiconfig is the Windows MIDI output device number.  Run "mixer /listmidi"
+# at the DOSBox-X prompt to list them and find the number of the interface the
+# SC-55 is plugged into.
+[midi]
+mpu401     = intelligent
+mpubase    = 330
+mididevice = win32
+midiconfig = 0
+samplerate = 48000
+
+# Software fallback, for when the hardware is not connected.  Swap this in for
+# the block above.  Be aware that the effects will not be right: every SoundFont
+# tested carries only the General MIDI bank 0, so Car-Engine and Car-Stop fall
+# back on Helicopter.
+#
+# mididevice       = fluidsynth
+# fluid.driver     = default
+# fluid.soundfont  = D:\Soundfonts\SGM-V2.01\SGM-V2.01.sf2
+# fluid.samplerate = 48000
+# fluid.gain       = .5
+# fluid.polyphony  = 256
+# fluid.reverb     = yes
+# fluid.chorus     = yes
+
+# Nothing else should make a sound, so that anything audible came out of the
+# MIDI port.
+[sblaster]
+sbtype = none
+
+[speaker]
+pcspeaker = false
+tandy     = off
+disney    = false
+
+[joystick]
+joysticktype = none
+
+[dos]
+xms = true
+ems = true
+umb = true
+
+[autoexec]
+echo off
+# EDIT: the directory holding GAME.EXE, SC15.DRV, SCSKIDMS.VCE and SCENG1.VCE.
+mount c "D:\path\to\stunts"
+c:
+GAME.EXE /sSC
+
+# ---------------------------------------------------------------------------
+# For the MT-32 reference, replace the [midi] section above with this and
+# change the last line to GAME.EXE /sMT.  mt32.romdir needs MT32_CONTROL.ROM
+# and MT32_PCM.ROM.
+#
+# [midi]
+# mpu401      = intelligent
+# mpubase     = 330
+# mididevice  = mt32
+# samplerate  = 48000
+# mt32.romdir = D:\path\to\mt32\roms
+# mt32.model  = mt32

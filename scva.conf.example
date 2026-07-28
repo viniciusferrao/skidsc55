@@ -1,0 +1,64 @@
+# DOSBox Staging configuration for testing SC15.DRV against Roland's own
+# SOUND Canvas VA, as an alternative to the Nuked SC-55 setup in
+# dosbox-staging.conf.example.
+#
+#     dosbox.exe --noprimaryconf --conf scva.conf
+#
+# The VA is a VST plugin, not a MIDI device, so something has to host it and
+# publish it as one. VST MIDI Driver does that:
+#
+#     HKCU\Software\VSTi Driver
+#       plugin = ...\Steinberg\VSTPlugins\Roland VS\SOUND Canvas VA.dll
+#
+# midiconfig is the device index, counting from 0 through the system's MIDI
+# output devices. A name works too, but when it does not match Staging falls
+# back to the default device without saying so, which is easy to mistake for
+# the VA playing.
+#
+# The log line is the only place the choice is stated:
+#
+#     MIDI:WIN32: Selected output device VST MIDI Synth (port A)
+#     MIDI: Opened device 'win32'
+#
+# On Windows that goes to stderr.txt in the working directory, not stdout.txt,
+# which stays empty. Read it with a shared handle while DOSBox runs, or wait
+# until it exits.
+#
+# The audio leaves through the VA's own output rather than DOSBox's mixer, so
+# the mixer volume does not apply to it and DOSBox cannot record it.
+
+[sdl]
+fullscreen  = false
+output      = opengl
+window_size = 960x600
+
+[render]
+shader = crt-auto
+
+# See dosbox-staging.conf.example for why the core stays on auto.
+[cpu]
+cpu_cycles = 60000
+cputype = 486
+core = auto
+
+[mixer]
+rate = 48000
+
+[midi]
+mpu401     = intelligent
+mididevice = port
+# EDIT: the index of the port the VA is on.
+midiconfig = 4
+
+# Nothing else may make a sound, so anything audible came out of the MPU-401.
+[sblaster]
+sbtype = none
+
+[speaker]
+pcspeaker = none
+
+[autoexec]
+# EDIT: the game directory, holding SC15.DRV, SCSKIDMS.VCE and SCENG1.VCE.
+mount c "D:\path\to\stunts"
+c:
+LOAD.EXE /u MCGA /ssc
