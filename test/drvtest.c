@@ -478,12 +478,39 @@ int main(int argc, char **argv)
           midi_hex(), "99 24 7F");
 
     /* --- controllers ------------------------------------------------------ */
+    /* Slot 12h maps its value through vol_curve before CC 7, because GS
+     * renders CC 7 at 40*log10 where the MT-32 is nearer linear amplitude,
+     * and the engine's crash-recovery fade crawled through the bottom of
+     * that curve as ten seconds of silence (issue 1). 100 comes out as
+     * 127*sqrt(100/127), which is 113; the ends of the table are pinned so
+     * silence stays silence and full stays full. */
     args[0] = 2;
     args[1] = 0;
     args[2] = 100;
     call_slot(0x12, args, 3);
     check_protocol("volume");
-    check("channel volume", midi_hex(), "B2 07 64");
+    check("channel volume is curved for GS", midi_hex(), "B2 07 71");
+
+    args[0] = 2;
+    args[1] = 0;
+    args[2] = 0;
+    call_slot(0x12, args, 3);
+    check("volume 0 is still silence", midi_hex(), "B2 07 00");
+
+    args[0] = 2;
+    args[1] = 0;
+    args[2] = 127;
+    call_slot(0x12, args, 3);
+    check("volume 127 is still full", midi_hex(), "B2 07 7F");
+
+    /* The value the fix exists for: the fade's early steps. Linear, CC 7 at
+     * 10 is -44 dB on GS and inaudible; curved it is 36, about -22 dB, which
+     * is what an MT-32 makes of 10. */
+    args[0] = 2;
+    args[1] = 0;
+    args[2] = 10;
+    call_slot(0x12, args, 3);
+    check("a fade's early step is audible", midi_hex(), "B2 07 24");
 
     args[0] = 2;
     args[1] = 0;
@@ -578,7 +605,7 @@ int main(int argc, char **argv)
     call_slot(0x12, args, 3);
     rig.tx_stall = 0;
     check("output completes while the interface is feeding bytes back",
-          midi_hex(), "B3 07 40");
+          midi_hex(), "B3 07 5A");
     check_int("the inbound bytes were consumed rather than left blocking",
               (long)rig.pend_n, 0L);
     got[0] = '\0';
@@ -619,7 +646,7 @@ int main(int argc, char **argv)
         args[1] = 0;
         args[2] = 64;
         call_slot(0x12, args, 3);
-        check("a re-init brings output back", midi_hex(), "B3 07 40");
+        check("a re-init brings output back", midi_hex(), "B3 07 5A");
     }
 
     /* --- slot 27h with the retrigger extension ---------------------------- */

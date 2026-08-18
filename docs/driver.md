@@ -149,7 +149,7 @@ not been examined, so the list above is a floor, not a complete cost.
 | 3    | 09h    | `void note_on(word ch, VOICE near *v, CHUNK near *c, int note, word vel, INSTR far *i)` | 9n note vel |
 | 4    | 0Ch    | `void note_off(word ch, VOICE near *v)`                           | 8n note 00 |
 | 5    | 0Fh    | `void voice_free(word ch, VOICE near *v)`                         | nothing |
-| 6    | 12h    | `void set_volume(word ch, word unused, word vol)`                 | CC 7 |
+| 6    | 12h    | `void set_volume(word ch, word unused, word vol)`                 | CC 7, through `vol_curve`: GS renders CC 7 at 40 log where the MT-32 is nearer linear, so the value is mapped by 127*sqrt(v/127), silence and full pinned. MT15 forwards it raw; the same bytes that fade on an MT-32 were ten seconds of silence on an SC-55 (issue 1, measured) |
 | 7    | 15h    | `void set_controller(word ch, word unused, word cc, word val)`    | CC cc |
 | 8    | 18h    | `void reset_controllers(void)`                                    | CC 121 on channels 0..15 |
 | 9    | 1Bh    | `void pitch_bend(word unused, int bend, word ch)`                 | En with bend + 2000h |

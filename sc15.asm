@@ -142,6 +142,37 @@ vol_msb         db      0
                 db      0F7h
 MSG_VOLUME_LEN  equ     $ - msg_volume
 
+; Slot 12h's value, remapped for the Sound Canvas's volume response.
+;
+; The engine glides effect volume through slot 12h a step per tick: the car
+; engine fades in over it, dies to 0 in a crash, and crawls back up while the
+; car restarts. MT15.DRV forwards the value to CC 7 untouched, and so did this
+; driver, and the bytes are right: both were captured on the same replay and
+; they agree. What differs is the synthesiser. GS renders CC 7 at
+; 40*log10(v/127) dB, so the bottom forty values are next to inaudible, where
+; the MT-32's response is nearer linear amplitude; the same crawl the MT-32
+; plays as a fade-in came out of an SC-55 as ten seconds of silence
+; (issue 1, measured on ENGOUT.RPL: volume 0 at 63.45s, +1 every 50ms from
+; 66s, nothing audible until 76s).
+;
+; Squaring the fraction back out fixes the response exactly:
+; 40*log10(sqrt(v/127)) is 20*log10(v/127), a linear-amplitude device. 0 stays
+; 0 and 127 stays 127, so the ends of every fade are untouched. Only slot 12h
+; reads this. The voice banks' own volumes go out with the program change and
+; the songs' controller events go through slot 15h, and both were calibrated
+; against the MT-32 by octave band measurement with those paths linear, so
+; they stay linear.
+; 12h in, MT-32 out: 127*sqrt(v/127), rounded, so 0 is 0 and 127 is 127.
+vol_curve       label byte
+    db    0, 11, 16, 20, 23, 25, 28, 30, 32, 34, 36, 37, 39, 41, 42, 44
+    db   45, 46, 48, 49, 50, 52, 53, 54, 55, 56, 57, 59, 60, 61, 62, 63
+    db   64, 65, 66, 67, 68, 69, 69, 70, 71, 72, 73, 74, 75, 76, 76, 77
+    db   78, 79, 80, 80, 81, 82, 83, 84, 84, 85, 86, 87, 87, 88, 89, 89
+    db   90, 91, 92, 92, 93, 94, 94, 95, 96, 96, 97, 98, 98, 99,100,100
+    db  101,101,102,103,103,104,105,105,106,106,107,108,108,109,109,110
+    db  110,111,112,112,113,113,114,114,115,115,116,117,117,118,118,119
+    db  119,120,120,121,121,122,122,123,123,124,124,125,125,126,126,127
+
 ;============================================================================
 ; Internal helpers
 ;============================================================================
@@ -542,8 +573,15 @@ gm_set_volume:
     push    bp
     mov     bp, sp
     mov     ah, byte ptr [bp+6]
-    mov     bh, 7
+    ; Through vol_curve, not verbatim: MT15 forwards this value raw and so did
+    ; this driver, but GS's volume response buries the bottom of the engine's
+    ; fades where the MT-32's does not. The table and the measurement are with
+    ; the messages above. BX is scratch under the ABI and masking the index
+    ; keeps a value above 7Fh inside the table rather than reading past it.
     mov     bl, byte ptr [bp+0Ah]
+    and     bx, 7Fh
+    mov     bl, byte ptr cs:vol_curve[bx]
+    mov     bh, 7
     call    cc_out
     pop     bp
     retf
