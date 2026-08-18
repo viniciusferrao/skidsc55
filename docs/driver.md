@@ -49,8 +49,10 @@ hold `HDR1` while the engine searches for `hdr1`.
 
 ## 2. Calling convention
 
-Every slot is a far procedure using the Borland C++ medium model cdecl
-convention, which is what the game is compiled with.
+Every slot is a far procedure using the Microsoft C 5.1 medium model cdecl
+convention, which is what the game is compiled with: `LOAD.EXE` carries the
+string `MS Run-Time Library - Copyright (c) 1988, Microsoft Corp`. That is
+the same compiler `MSCBUILD.BAT` builds this repository's tooling with.
 
 - Arguments are pushed right to left and the caller cleans the stack. The first
   argument is at `[bp+6]` after the usual `push bp` / `mov bp,sp`.
