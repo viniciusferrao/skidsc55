@@ -34,11 +34,12 @@ SC15 MKVCE VOICES\SCSKIDMS.TXT SCSKIDMS.VCE
 SC15 MKVCE VOICES\SCENG1.TXT SCENG1.VCE
 ```
 
-The `source` line at the top of each file in `voices/` has to name a path that
-reaches your game directory; `mkvce` resolves it relative to the specification
-file. On DOS that cannot climb above the mount root, so give it an absolute
-path there, for example `source G:MTSKIDMS.VCE`. `make release-check` proves
-the shipped pair is byte for byte what the build produces.
+The `source` line at the top of each file in `voices/` must give a path that
+reaches your game directory. `mkvce` resolves the path relative to the
+specification file. A DOS build cannot follow a path above its mount root, so
+on DOS give an absolute path, for example `source G:MTSKIDMS.VCE`.
+`make release-check` proves the shipped pair is byte for byte what the build
+produces.
 
 
 ## Installing

@@ -205,8 +205,8 @@ make driver banks
 cp SC15.DRV SCSKIDMS.VCE SCENG1.VCE /path/to/stunts/
 ```
 
-Or copy the same three files out of `bin/`. Nothing installs automatically;
-skidset is the program that manages a game directory. Start the game with
+Or copy the same three files from `bin/`. No build installs the files. You
+copy them yourself, or skidset does. Start the game with
 
 ```
 GAME.EXE /sSC
@@ -298,9 +298,9 @@ initial master volume at 51h. See driver.md section 7.
 
 Setting the byte at offset 50h to 1 makes the driver send a GS Reset after the
 GM reset, and enables bank select for instruments that ask for a non-zero bank.
-Test this only after everything above passes on plain General MIDI, and re-run
-check 2 and check 9 on a non-GS device afterwards to confirm the driver still
-behaves when the flag is left at 0.
+Test this only after every check above passes on plain General MIDI. Then
+re-run check 2 and check 9 on a non-GS device. This confirms that the driver
+stays correct when the flag is 0.
 
 
 ## 3.1 Launching twice in one DOS session
